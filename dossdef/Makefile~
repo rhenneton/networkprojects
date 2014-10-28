@@ -4,7 +4,7 @@ all : send.c rec.c
 	
 send : send.c 
 	gcc send.c -o send -lz -lpthread
-	./send --file input.txt --delay 30 romain-UX303LA 12345
+	./send --file haha.txt --sber 20 --splr 500 romain-UX303LA 12345
 	
 rec : rec.c
 	gcc rec.c -o rec -lz -lpthread
