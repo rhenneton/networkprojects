@@ -3,7 +3,12 @@
 #include <getopt.h>
 #include <sys/stat.h>
 #include <fcntl.h> 
-
+ #include <sys/types.h>
+   #include <sys/socket.h>
+   #include <netinet/in.h>
+   #include <stdio.h>
+   #include <netdb.h>
+   
 int lastreceived = 0;
 packet buffer[32];
 pthread_mutex_t buffermut;
@@ -69,8 +74,8 @@ int main(int argc, char **argv)
 	int i = 0;
 	
 	
-	struct sockaddr_in myaddr;	/* our address */
-	struct sockaddr_in remaddr;	/* remote address */
+	struct addrinfo req, *ans;	/* our address */
+	struct sockaddr_in6 remaddr;	/* remote address */
 	socklen_t addrlen = sizeof(remaddr);		/* length of addresses */
 	int recvlen;			/* # bytes received */
 	int fd;				/* our socket */
@@ -80,20 +85,28 @@ int main(int argc, char **argv)
 	
 
 	/* create a UDP socket */
+	
+	req.ai_flags = AI_PASSIVE;
+   
 
-	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+
+   	req.ai_family = PF_INET6;             /* Same as AF_INET6.    */
+   
+
+
+   	req.ai_socktype = SOCK_DGRAM;
+   	req.ai_protocol = 0;
+	getaddrinfo("::1",portnumber,&req,&ans);
+	if ((fd = socket(ans->ai_family, ans->ai_socktype, ans->ai_protocol)) < 0) {
 		perror("cannot create socket\n");
 		return 0;
 	}
 
 	/* bind the socket to any valid IP address and a specific port */
 
-	memset((char *)&myaddr, 0, sizeof(myaddr));
-	myaddr.sin_family = AF_INET;
-	myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	myaddr.sin_port = htons(12345);
+	
 
-	if (bind(fd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) {
+	if (bind(fd,ans->ai_addr,ans->ai_addrlen) < 0) {
 		perror("bind failed");
 		return 0;
 	}
