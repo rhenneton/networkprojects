@@ -118,7 +118,7 @@ int main(int argc,char * argv[])
 	
 	int size = strnlen(chaine,1000000);
 	int i;
-	nbrpack = (size/512)+1;
+	nbrpack = (size/511)+1;
 	packet grosbuf[nbrpack];
 	int count;
 	for(i=0;i<nbrpack;i++)
@@ -137,6 +137,7 @@ int main(int argc,char * argv[])
 		pack->length = strnlen(pack->payload,520);
 		pack->crc = crc32(0,(void *) (pack),sizeof(packet)-4);
 		grosbuf[i] = *pack;
+		printf("%s\n\n",pack->payload);
 		
 	}
 	
@@ -144,18 +145,24 @@ int main(int argc,char * argv[])
 	
 	
 	
-	struct addrinfo hints;
-	memset(&hints,0,sizeof(hints));
-	hints.ai_family=AF_INET;
-	hints.ai_socktype=SOCK_DGRAM;
-	hints.ai_protocol=0;
-	hints.ai_flags=AI_ADDRCONFIG;
-	err=getaddrinfo(hostname,portname,&hints,&res);
+	struct addrinfo req, *ans;
+	req.ai_flags = AI_PASSIVE;
+   
 
-	fd=socket(res->ai_family,res->ai_socktype,res->ai_protocol);
-	if (fd==-1) {
-	    
+
+   	req.ai_family = PF_INET6;             /* Same as AF_INET6.    */
+   
+
+
+   	req.ai_socktype = SOCK_DGRAM;
+   	req.ai_protocol = 0;
+	getaddrinfo("::1",portname,&req,&ans);
+	if ((fd = socket(ans->ai_family, ans->ai_socktype, ans->ai_protocol)) < 0) {
+		perror("cannot create socket\n");
+		return 0;
 	}
+	
+	
 
 	pthread_t resend;
 	pthread_t ackrec;
@@ -183,7 +190,8 @@ int main(int argc,char * argv[])
 		{
 			
 			pthread_mutex_lock(&mutex);
-			if (sendto(fd,&grosbuf[i],sizeof(packet),0,    res->ai_addr,res->ai_addrlen)==-1) {
+			
+			if (sendto(fd,&grosbuf[i],sizeof(packet),0,ans->ai_addr,ans->ai_addrlen)==-1) {
 	
 			}
 			else
@@ -191,7 +199,6 @@ int main(int argc,char * argv[])
 			
 			}
 			pthread_mutex_unlock(&mutex);
-			
 		}
 		if(altered == 1)
 		{
