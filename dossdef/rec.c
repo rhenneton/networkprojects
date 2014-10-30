@@ -198,6 +198,7 @@ int main(int argc, char **argv)
 					else
 					{
 						printf("%s",buf->payload);
+						printf("\n%d\n",buf->seqnum);	
 					}
 					lastreceived = ((buf->seqnum)+1)%256;
 				}

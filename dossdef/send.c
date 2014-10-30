@@ -18,7 +18,7 @@ int sendable = 1;
 int elemnow = 0;
 int done =0;
 int nbrpack; 
-
+int huhuu=0;
 void*resender(void*param);
 void *ackreceiver(void * param);
 struct addrinfo req, *ans;
@@ -149,7 +149,10 @@ int main(int argc,char * argv[])
 		grosbuf[i] = *pack;
 		free(pack);
 		pack=NULL;
-		
+		if(i==nbrpack-1)
+		{
+			huhuu=1;
+		}
 	}
 	free(chaine);
 	chaine = NULL;
@@ -310,7 +313,7 @@ void *ackreceiver(void * param)
 			
 			difference = buf->seqnum - elemnow;
 			elemnow = ((buf->seqnum))% 256;
-			if((int) buf->seqnum==nbrpack)
+			if((int) buf->seqnum==nbrpack%256&&huhuu ==1)
 			{
 				
 				if(buf->seqnum+count*256==nbrpack)
