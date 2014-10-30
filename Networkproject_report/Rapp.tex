@@ -88,15 +88,13 @@ Ce premier test a eu lieu en collaboration avec le groupe composé de \textit{Ch
 En effet, notre \textit{receiver} couplé avec leur \textit{sender} fonctionnait sans problème apparent et il en est de même pour notre \textit{sender} couplé avec leur \textit{receiver}. 
 
 \subsection{Second test}
-Ce dernier a eu lieu en collaboration avec le groupe composé de \textit{Sandrine Romainville} et \textit{   }.
+Ce dernier a eu lieu en collaboration avec le groupe composé de \textit{Sandrine Romainville} et \textit{Jolan Werner}.
 
 \section{Remarques, limitations et difficultés rencontrées}
 \begin{enumerate}
 \item Dans un paquet, nous pouvons stocker au maximum 511 bytes. En effet, la consigne étant de pouvoir envoyer un input sur \textit{stdin}, nous devons conserver le dernier caractère du \textit{payload} libre pour pouvoir y insérer le caractère \textit{\textbackslash 0} indiquant la fin de la chaîne de caractères. 
 \smallskip
 \item De plus, ce qui découle de cette première remarque est le fait que nous ne pouvons envoyer que des fichiers \textit{.txt} et non pas de fichiers binaires (qui seraient de toute manière inaffichables sur \textit{stdout}). Il pourrait être intéressant de vérifier par la suite le type d'input, et de s'adapter au type .txt et/ou binaire.
-\smallskip
-\item Nous n'avions pas bien compris l'utilisation de l'option \textit{delay} dans les consignes intiiales et pensions qu'il s'agissait du temps d'attente entre deux envois de paquets. Nous avons donc corrigé ce problème en réalisant une fonction alternative \texttt{sendtobis} qui attend un certain temps avant d'envoyer le paquet. Au lieu d'utiliser \textit{sendto} dans la fonction principale avec le \textit{resender}, nous allons donc créer un thread pour chaque paquet à envoyer, utilisant cette fonciton \texttt{sendtobis} et ce, afin d'implémenter correctement le \textit{delay} qui est le temps de propagation sur le câble. 
 \smallskip
 \item Pour implémenter \texttt{sber}, nous avons utilisé un \textit{flag} indiquant si un caractère a été modifié (nous modifions uniquement le premier caractère du \textit{payload}) et lorsque le paquet a été envoyé, nous remettons ce caractère modifié à sa valeur initiale afin d'éviter que le paquet reste indéfiniment corrompu et que le \textit{resender} puisse l'envoyer correctement.
 \smallskip
@@ -105,5 +103,8 @@ Ce dernier a eu lieu en collaboration avec le groupe composé de \textit{Sandrin
 \item Nous avons utilisé des \texttt{mutex} pour protéger le \textit{socket} de descripteur de fichier du \textit{send} ainsi que l'entier "\texttt{elemenow}" utilisé dans les différents threads (exclusion mutuelle).
 \end{enumerate}
 
-%\subsection{Extensions}
+\subsection{Extension(s)}
+Nous n'avions pas bien compris l'utilisation de l'option \textit{delay} dans les consignes intiiales et pensions qu'il s'agissait du temps d'attente entre deux envois de paquets. \\
+Pour corriger ce problème, nous pourrions réalisé une fonction alternative \texttt{sendtobis} qui attend un certain temps avant d'envoyer le paquet. Au lieu d'utiliser \textit{sendto} dans la fonction principale avec le \textit{resender}, nous pourrons donc créer un thread pour chaque paquet à envoyer, utilisant cette fonciton \texttt{sendtobis} et ce, afin d'implémenter correctement le \textit{delay} qui est le temps de propagation sur le câble. 
+
 \end{document}

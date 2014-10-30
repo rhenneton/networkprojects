@@ -1,0 +1,10 @@
+\select@language {french}
+\contentsline {section}{Introduction}{2}{section*.2}
+\contentsline {section}{\numberline {1}Structure du programme}{2}{section.1}
+\contentsline {subsection}{\numberline {1.1}Sender}{2}{subsection.1.1}
+\contentsline {subsection}{\numberline {1.2}Receiver}{3}{subsection.1.2}
+\contentsline {section}{\numberline {2}Tests d'interop\IeC {\'e}rabilit\IeC {\'e}}{3}{section.2}
+\contentsline {subsection}{\numberline {2.1}Premier test}{3}{subsection.2.1}
+\contentsline {subsection}{\numberline {2.2}Second test}{3}{subsection.2.2}
+\contentsline {section}{\numberline {3}Remarques, limitations et difficult\IeC {\'e}s rencontr\IeC {\'e}es}{4}{section.3}
+\contentsline {subsection}{\numberline {3.1}Extension(s)}{4}{subsection.3.1}
