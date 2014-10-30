@@ -1,41 +1,43 @@
-#include "headers.h"
-#include <unistd.h>
-#include <time.h>
-#include <semaphore.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <getopt.h>
-#include <sys/stat.h>
-#include <fcntl.h> 
+#include "headers.h" 
+#define SIZEMAX 100000000
+
 
 int fd;
 sem_t semaphore;
-pthread_mutex_t mutex;
-pthread_mutex_t elemnowmut;
+pthread_mutex_t mutex;		//Mutex protégeant le file descriptor fd correspondant au socket 
+pthread_mutex_t elemnowmut;	//Mutex protégeant l'entier elemnow
 struct addrinfo* res=0;
+
+
 int firstelem = 0;
 int sber = 0;
 int splr = 0;
 int delay = 1;
 int err;
-int sendable = 32; 
+int sendable = 1; 
 int elemnow = 0;
 int done =0;
 int nbrpack; 
 
 void*resender(void*param);
 void *ackreceiver(void * param);
-
+struct addrinfo req, *ans;
 
 int main(int argc,char * argv[])
 {
 	
 
-	const char* hostname; /* localhost */
-	const char* portname;
-	char * chaine=(char *) malloc(100000);
-	int fs;
-	int text = 0;
+	char* hostname; 
+	char* portname;
+	char * chaine=(char *) malloc(SIZEMAX*sizeof(char));
+	
+	
+	int fs;		//File descriptor si lecture depuis fichier
+	int text = 0; 	//flag indiquant si la lecture doit se faire depuis stdin (0) ou depuis un fichier (1)
+	
+	
+	
+	//Initialisation du sémaphore et des mutex
 	
 	err=sem_init(&semaphore, 0,sendable); 
 	if(err!=0) 
@@ -53,7 +55,14 @@ int main(int argc,char * argv[])
 		error(err,"mutex_init");
 	}	
 	
-	/* Création du buffer A partir d'une séquence de bytes */
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////    Récupération des différents arguments (hostname  //////////////////////////////////////////////
+////////    et port) et des options: si nécessaire           //////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////	
 	
 	
 	
@@ -72,7 +81,7 @@ int main(int argc,char * argv[])
 		{
 			case 'a':
 			fs = open(optarg,O_RDONLY);
-			read(fs,(void *) chaine,100000);
+			read(fs,(void *) chaine,SIZEMAX*sizeof(char));
 
 			text=1;
 			
@@ -97,26 +106,27 @@ int main(int argc,char * argv[])
 		
 		
 	}
-	
-	if(text==0)
-	{
-		fgets(chaine,100000,stdin);
-	}
-	
-	
-	printf("sber = %d\n",sber);
-	printf("splr = %d\n",splr);
-	printf("delay = %d\n",delay);	
 	hostname = argv[argc-2];
 	portname = argv[argc-1];
+	if(text==0)
+	{
+		fgets(chaine,SIZEMAX,stdin);
+	}
+
+
 	
 	
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////   Création des paquets et du "gros buffer"        ///////////////////////////////
+/////////////////////////   contenant l'ensemble des packets à envoyer      ///////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////	
 	
+//Note : Le nombre de bytes "reels" maximum dans un payload est 511 et pas 512, en effet, le dernier
+//élément DOIT être un '\0' indiquant la fin de la chaine de caractères	
 	
-	
-	
-	
-	int size = strnlen(chaine,1000000);
+	int size = strnlen(chaine,SIZEMAX);
 	int i;
 	nbrpack = (size/511)+1;
 	packet grosbuf[nbrpack];
@@ -133,41 +143,65 @@ int main(int argc,char * argv[])
 		pack->payload[count+1]='\0';
 		pack->type = 1;
 		pack->window = 0;
-		pack->seqnum = i% 65535;
+		pack->seqnum = i%256;
 		pack->length = strnlen(pack->payload,520);
 		pack->crc = crc32(0,(void *) (pack),sizeof(packet)-4);
 		grosbuf[i] = *pack;
-		printf("%s\n\n",pack->payload);
+		free(pack);
+		pack=NULL;
 		
 	}
+	free(chaine);
+	chaine = NULL;
+	
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////	
+///////////////////////////////////////////////////////////////////////////////////////////////////////////	
+//////////////////////////////  Fin de la partie récupération d'arguments et     //////////////////////////	
+//////////////////////////////  préparation des différentes adresses             //////////////////////////	
+///////////////////////////////////////////////////////////////////////////////////////////////////////////	
+///////////////////////////////////////////////////////////////////////////////////////////////////////////	
 	
 	
 	
 	
-	
-	struct addrinfo req, *ans;
 	req.ai_flags = AI_PASSIVE;
-   
-
-
-   	req.ai_family = PF_INET6;             /* Same as AF_INET6.    */
-   
-
-
-   	req.ai_socktype = SOCK_DGRAM;
+ 	req.ai_family = PF_INET6;    	     	//Nous utilisons IPv6
+   	req.ai_socktype = SOCK_DGRAM;		//et des datagrammes			
    	req.ai_protocol = 0;
+   	
+   	
+   	//Récupération des informations sur le host, port via getaddrinfo et création du socket
+   	
+   	
 	getaddrinfo("::1",portname,&req,&ans);
 	if ((fd = socket(ans->ai_family, ans->ai_socktype, ans->ai_protocol)) < 0) {
-		perror("cannot create socket\n");
+		perror("Impossible de créer le socket\n");
 		return 0;
 	}
 	
 	
-
+	/*
+	Lancement du ack-listener et du resender sur 2 threads
+	*/
+	
 	pthread_t resend;
 	pthread_t ackrec;
+	
 	err=pthread_create(&resend,NULL,&resender,&grosbuf);
-	err=pthread_create(&resend,NULL,&ackreceiver,NULL);
+	if(err!=0)
+	{
+		perror("ptread_create\n");
+	}
+	
+	err=pthread_create(&ackrec,NULL,&ackreceiver,NULL);
+	if(err!=0)
+	{
+		perror("ptread_create\n");
+	}
+	
+	
+	
 	int altered = 0;
 	char caraltered;
 	for(i=0;i<nbrpack;i++)
@@ -182,10 +216,13 @@ int main(int argc,char * argv[])
 			altered = 1;
 			grosbuf[i].payload[0]+= 2;
 		}
+		
+		//Non envoi du packet
 		if(random()%1000<splr)
 		{
 		
 		}
+		//Envoi du packet
 		else
 		{
 			
@@ -196,10 +233,11 @@ int main(int argc,char * argv[])
 			}
 			else
 			{
-			
+				
 			}
 			pthread_mutex_unlock(&mutex);
 		}
+		//Rétablissement du packet (dans le buffer) à son état initial (sans corruption)
 		if(altered == 1)
 		{
 			altered = 0;
@@ -214,11 +252,28 @@ int main(int argc,char * argv[])
 	{
 	
 	}
-	sem_destroy(&semaphore);	
+	sem_destroy(&semaphore);
+	free(ans);	
+	close(fd);
+	if(text==1)
+	{
+	close(fs);
+	}
+	err=pthread_join(resend,NULL); 
+	if(err!=0) 
+	perror("pthread_join");
+	err=pthread_join(ackrec,NULL); 
+	if(err!=0) 
+	perror("pthread_join"); 
 	return 0;
 }
 
 
+
+
+/*
+Cette fonction est une sorte d'ack-listener, mettant à jour le numéro de l'élément actuel à recevoir
+*/
 void *ackreceiver(void * param)
 {
 		
@@ -227,24 +282,38 @@ void *ackreceiver(void * param)
 	int recvlen;						
 	int msgcnt = 0;			
 	packet *buf = (packet*) malloc(sizeof(packet));	
+	if(buf==NULL)
+	{
+		perror("erreur de malloc");
+	}
 	char* portnumber = "12345";
 	int difference =0;
 	int count = 0;
 	int i;
+	int lastacked = 0;
 	while(done==0) 
 	{
 		recvlen = recvfrom(fd, buf, sizeof(packet), 0, (struct sockaddr *)&remaddr, &addrlen);
 		if (recvlen > 0&&buf->type==2) {
 			
+			if(sendable < ((int)(buf->window))+1)
+			{
+				sendable = ((int)(buf->window))+1;
+				for(i=0;i<buf->window;i++)
+				{
+					
+					sem_post(&semaphore);
+				}
+			}
 			
 			pthread_mutex_lock(&elemnowmut);
 			
 			difference = buf->seqnum - elemnow;
-			elemnow = ((buf->seqnum)-1)% 65535;
+			elemnow = ((buf->seqnum))% 256;
 			if((int) buf->seqnum==nbrpack)
 			{
 				
-				if(buf->seqnum+count*65536==nbrpack)
+				if(buf->seqnum+count*256==nbrpack)
 				{
 					done=1;
 				}
@@ -252,8 +321,10 @@ void *ackreceiver(void * param)
 				count++;
 			}
 			pthread_mutex_unlock(&elemnowmut);
+			
 			for(i=0;i<difference;i++)
 			{
+				
 				sem_post(&semaphore);
 			}
 			
@@ -262,6 +333,8 @@ void *ackreceiver(void * param)
 		}
 		
 	}
+	free(buf);
+	buf = NULL;
 }
 
 void *resender(void*param)
@@ -287,7 +360,7 @@ void *resender(void*param)
 			
 			
 			i=lastfirstelem;
-			while(i<lastfirstelem+sendable&&done==0)
+			while(i<lastfirstelem+sendable&&done==0&&i<nbrpack)
 			{
 				pthread_mutex_lock(&elemnowmut);
 				nowfirstelem = elemnow;
@@ -312,10 +385,12 @@ void *resender(void*param)
 				}
 				else
 				{
-			
+					
 					pthread_mutex_lock(&mutex);
-					sendto(fd,((currentpack)+i),sizeof(packet),0, res->ai_addr,res->ai_addrlen);
-						
+					
+					
+					sendto(fd,((currentpack)+i),sizeof(packet),0, ans->ai_addr,ans->ai_addrlen);
+					
 					
 					
 					pthread_mutex_unlock(&mutex);

@@ -3,12 +3,12 @@ all : send.c rec.c
 	gcc rec.c -o rec -lz -lpthread
 	
 send : send.c 
-	gcc send.c -o send -lz -lpthread
-	./send --file input.txt --delay 30 romain-UX303LA 12345
+	gcc send.c -o send -lz -lpthread -fno-stack-protector
+	./send  --file input.txt --splr 0 --sber 0 ::1 12345
 	
 rec : rec.c
 	gcc rec.c -o rec -lz -lpthread
-	./rec 12345
+	./rec :: 12345
 	
 clean : 
 	rm rec
