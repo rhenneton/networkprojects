@@ -1,0 +1,69 @@
+\usepackage{graphicx}
+\usepackage{ifthen}
+\usepackage{array}
+
+\gdef\@author{\Huge Set \textbackslash{}author}
+\gdef\@cours{\Huge Set \textbackslash{}cours}
+\gdef\@professeur{\Huge Set \textbackslash{}professeur}
+\gdef\@annee{\Huge Set \textbackslash{}annee}
+\gdef\@codecours{\Huge Set \textbackslash{}codecours}
+\gdef\@programme{\Huge Set \textbackslash{}programme}
+\gdef\@foot{}
+\gdef\@email{}
+\gdef\@noma{}
+\gdef\@subtitle{}
+
+\def\author#1{\gdef\@author{#1}}
+\def\cours#1{\gdef\@cours{#1}}
+\def\codecours#1{\gdef\@codecours{#1}}
+\def\professeur#1{\gdef\@professeur{#1}}
+\def\annee#1{\gdef\@annee{#1}}
+\def\subtitle#1{\gdef\@subtitle{#1}}
+\def\programme#1{\gdef\@programme{#1}}
+\def\email#1{\gdef\@email{#1}}
+\def\noma#1{\gdef\@noma{#1}}
+\def\foot#1{\gdef\@foot{\it #1}}
+
+\def\maketitle{
+\begin{titlepage}
+  \begin{center}\leavevmode
+	\vfill
+	\normalfont
+	\rule{\textwidth}{1pt} \\
+	\medskip
+   	{\Huge \@title\par}
+	\medskip
+	\ifthenelse{\not\equal{\@subtitle}{}}{\LARGE \@subtitle\par}{}
+	\rule{\textwidth}{1pt} \\	
+	\begin{tabular*}{\textwidth}{l!{\extracolsep{\fill}} r}
+		\Large & \Large Le \@31 octobre 2014\par \\
+	\end{tabular*}
+	\vskip 1cm
+	\ifthenelse{\not\equal{\@email}{}}{\large \@email \\}{}
+	\ifthenelse{\not\equal{\@noma}{}}{\large Matricule : \@noma}{}
+  \end{center}
+  \vfill
+  \null
+
+\hskip -2cm
+\begin{minipage}{.5\textwidth}
+ \begin{flushleft}
+  	\begin{tabular}[t]{r@{ --- }l}
+	\bf Cours & \@codecours~--~\@cours\par \\
+	\bf Auteurs & Sundeep Dhillon (6401-11-00) \\
+			 & Romain Henneton (4783-12-00) \\
+	\bf Professeur & \@professeur\par \\
+	\bf Année académique & \@annee\par \\				
+	\bf Programme d'études & \@programme\par
+	\end{tabular}
+   \end{flushleft}
+\end{minipage}
+\hskip 3cm
+\begin{minipage}{.5\textwidth}
+  \begin{flushright}
+  	\includegraphics[scale=0.8]{logo.jpg}
+   \end{flushright}
+\end{minipage}
+  \cleardoublepage
+  \end{titlepage}
+}

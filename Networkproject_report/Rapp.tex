@@ -1,0 +1,109 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath}
+\usepackage[bookmarks={true},bookmarksopen={true}]{hyperref}
+\usepackage{graphicx}
+\pagestyle{plain}
+\setlength{\parindent}{5mm}
+% Package ci-dessous = ce qui est utilisé d'habitude mais version adaptée
+\usepackage{lmodern}
+\usepackage[top=3cm, bottom=3cm, left=3cm, right=3cm]{geometry}
+%\usepackage[hidelinks,pdftex,bookmarks=true]{hyperref}
+\usepackage{tabularx}
+\usepackage[french]{minitoc}
+\usepackage{wasysym}
+\usepackage{pageDeGarde}
+\usepackage{csquotes}
+\usepackage{graphicx}
+\usepackage{pbox}
+\usepackage{tikz}
+
+\title{LINGI1341 - Projet 1}
+\subtitle{Protocole de transfert fiable}
+\cours{Réseaux informatiques}
+\codecours{LINGI1341} 
+%\auteurs{}  car on a pas de numéro de groupe
+\professeur{Olivier Bonaventure}
+\annee{2014--2015}
+\programme{FSA13BA et SINF13BA}
+
+
+\begin{document}
+\thispagestyle{empty}
+\maketitle
+\thispagestyle{empty}
+\tableofcontents
+\setcounter{tocdepth}{3}
+\setcounter{page}{1}
+\newpage
+
+\section*{Introduction}
+\addcontentsline{toc}{section}{Introduction}
+Dans le cadre de notre cours de réseaux informatiques, on nous a confié un projet consistant à la création d'un protocole UDP de transfert fiable en utilisant un \textit{selective repeat}. Ce projet est composé de deux objectifs principaux: être capable de créer ce protocole de transfert et effectuer des tests avec les protocoles créés par d'autres groupes d'étudiants (et éventuellement, apporter des modifications à notre code suite à ces tests).
+
+\section{Structure du programme}
+Il nous a été demandé de créer un protocole de transfert gérant le \textit{selective repeat}. \\ Pour cela, deux options s'offraient à nous, à savoir:
+\begin{itemize}
+\item Utiliser la fonction "\texttt{select}" toute faite, gérant les \textit{timer} et les \textit{acknowledgements} automatiquement. 
+\item Implémenter ce \textit{selective repeat} via des threads (un \textit{listener} et un \textit{timer}). 
+\end{itemize} \smallskip
+Nous avons décidé d'utiliser la seconde méthode. En effet, il nous semblait plus intéressant de comprendre fondamentalement comment se passait le \textit{selective repeat} plutôt que d'utiliser une fonction toute faite, et ceci afin qu'en cas d'erreur, nous puissions cibler le problème facilement vu que nous utilisons nos propres fonctions et donc, une implémentation de plus bas niveau, spécifique à notre code. 
+
+\subsection{Sender}
+Ce dernier est composé de trois blocs principaux, à savoir: 
+\begin{itemize}
+\item \texttt{sender primaire}
+\item \texttt{ackreceiver}
+\item \texttt{resender}
+\end{itemize}
+\smallskip
+
+Dans le \textbf{sender primaire}, nous commençons par récupérer les différentes options et informations telles que le port, le hostname ainsi que les options facultatives. Ensuite, nous créons un tableau contenant les paquets à envoyer dans l'ordre. Par la suite, un sémaphore est utilisé pour limiter le nombre de paquets envoyés simultanément (notion de \textit{window}). \\
+
+\smallskip 
+Ce sémaphore est initialisé à 1 et à la réception du premier \textit{acknowledgement} (voir \textbf{ackreceiver}), nous mettons à jour la taille de la \textit{window} maximale grâce à l'information \textit{window} située à l'intérieur du paquet \textit{acknowledgement}. Il est donc possible d'envoyer au départ, un seul paquet et par la suite, le nombre de paquets est adapté au \textit{buffer} de réception, le tout de manière séquentielle. \\
+
+\smallskip
+Pendant ce temps, deux threads s'exécutent en parallèle: 
+l'\textbf{ackreceiver} qui écoute sur le \textit{socket}, réceptionne les \textit{acknowledgements}, les traite de façon à indiquer au \textbf{resender} quel(s) paquet(s) doit/doivent être ré-envoyé(s) et quel(s) paquet(s) a/ont été correctement réceptionné (afin de gérer les pertes de paquets dûes à \textit{sber}, et à \textit{splr}) ainsi que d'indiquer quand le \textit{sender} et les différents threads doivent s'arrêter. Lorsqu'un \textit{acknowledgement} correct est reçu, l'\textbf{ackreceiver} effectue un/plusieurs sempost(s) afin de mettre à jour la \textit{window} d'envoi. \\ 
+
+\smallskip
+Le \textbf{resender} est un thread qui vérifie, via un timer, quels paquets doivent être ré-envoyés. Pour cela, il mémorise le numéro de séquence du premier élément de la \textit{window} avant le lancement du \textit{timer} et le compare avec le numéro de séquence du premier élément après le \textit{timer}. Si un \textit{acknowledgement} a été correctement reçu par l'\textbf{ackreceiver}, alors cette valeur sera différente (mise à jour de la variable "\texttt{elemnow}"), et le \textit{timer} sera relancé. Par contre, si ces deux numéros de séquence sont égaux, cela signifie que le premier paquet de la \textit{window} n'a pas été correctement reçu et doit donc etre ré-envoyé. Avant de ré-envoyer les paquets futurs, le \textbf{resender} vérifie chaque fois ce numéro "\texttt{elemnow}". 
+
+\subsection{Receiver}
+Comme pour le \textbf{sender}, le \textbf{receiver} récupère tout d'abord les différentes options, lit le socket en prenant différents paramètres tels que le \textit{hostname} et le \textit{port}. Par la suite, il écoute sur le \textit{socket} (\texttt{receivefrom}) pour récupérer les paquets envoyés par le \textbf{sender}. Lorsqu'un paquet est reçu, trois cas se présentent à nous:
+\begin{itemize}
+\item Soit le CRC est incorrect et aucun \textit{acknowledgement} n'est envoyé.
+\item Soit le CRC est correct, mais le numéro de séquence n'est pas le bon (le numéro de séquence est supérieur au numéro de séquence attendu). Dans ce cas-là, le paquet est stocké dans un \textit{buffer} (notion de \textit{window}).
+\item Si le CRC est correct et que le numéro de séquence du paquet est le numéro de séquence attendu, alors le paquet est imprimé sur \textit{stdout} ou dans le \textit{filename} spécifié dans les options. \\ De plus, on vérifie si les numéros de séquence suivants sont présents dans le \textit{buffer} ou non. Si oui, ils sont écrits jusqu'à arriver à un numéro de séquence manquant. \\ 
+Une fois tout cela effectué, un \textit{acknowledgement} portant le numéro du dernier paquet écrit $+$ 1 est renvoyé au \textbf{sender}. Si un paquet de taille inférieur à 511 bytes est écrit, cela signifie que c'était le dernier et le \textbf{receiver} se termine.
+\end{itemize}
+
+\section{Tests d'interopérabilité}
+Nous avons réalisé des tests d'interopérabilité entre notre code et celui de deux autres groupes. 
+\subsection{Premier test}
+Ce premier test a eu lieu en collaboration avec le groupe composé de \textit{Charles Jacquet} ainsi que \textit{Stéphane Kimmel}. Assez étonnament, nous avons pu constater que tout fonctionnait de manière correcte du premier coup. Nous avons donc pu bien vérifier que l'implémentation de notre \textit{sender} était indépendante de l'implémentation du \textit{receiver} et par conséquent, générique et théoriquement ré-utilisable par n'importe quel groupe. \\ 
+En effet, notre \textit{receiver} couplé avec leur \textit{sender} fonctionnait sans problème apparent et il en est de même pour notre \textit{sender} couplé avec leur \textit{receiver}. 
+
+\subsection{Second test}
+Ce dernier a eu lieu en collaboration avec le groupe composé de \textit{Sandrine Romainville} et \textit{   }.
+
+\section{Remarques, limitations et difficultés rencontrées}
+\begin{enumerate}
+\item Dans un paquet, nous pouvons stocker au maximum 511 bytes. En effet, la consigne étant de pouvoir envoyer un input sur \textit{stdin}, nous devons conserver le dernier caractère du \textit{payload} libre pour pouvoir y insérer le caractère \textit{\textbackslash 0} indiquant la fin de la chaîne de caractères. 
+\smallskip
+\item De plus, ce qui découle de cette première remarque est le fait que nous ne pouvons envoyer que des fichiers \textit{.txt} et non pas de fichiers binaires (qui seraient de toute manière inaffichables sur \textit{stdout}). Il pourrait être intéressant de vérifier par la suite le type d'input, et de s'adapter au type .txt et/ou binaire.
+\smallskip
+\item Nous n'avions pas bien compris l'utilisation de l'option \textit{delay} dans les consignes intiiales et pensions qu'il s'agissait du temps d'attente entre deux envois de paquets. Nous avons donc corrigé ce problème en réalisant une fonction alternative \texttt{sendtobis} qui attend un certain temps avant d'envoyer le paquet. Au lieu d'utiliser \textit{sendto} dans la fonction principale avec le \textit{resender}, nous allons donc créer un thread pour chaque paquet à envoyer, utilisant cette fonciton \texttt{sendtobis} et ce, afin d'implémenter correctement le \textit{delay} qui est le temps de propagation sur le câble. 
+\smallskip
+\item Pour implémenter \texttt{sber}, nous avons utilisé un \textit{flag} indiquant si un caractère a été modifié (nous modifions uniquement le premier caractère du \textit{payload}) et lorsque le paquet a été envoyé, nous remettons ce caractère modifié à sa valeur initiale afin d'éviter que le paquet reste indéfiniment corrompu et que le \textit{resender} puisse l'envoyer correctement.
+\smallskip
+\item Lors de nos tests, nous avons vérifié que le \textit{selective repeat} fonctionnait correctement (en regardant l'ordre dans lequel les paquets arrivaient, que le buffer fonctionnait bien...etc). Cependant, nous avons supprimé les \texttt{printf} nécessaires à ce debug car si le \textit{payload} reçu doit être affiché sur \textit{stdout} (pas d'option \textit{file}), alors le texte sur \textit{stdout} contiendrait à la fois le texte de debug ainsi que les différentes données envoyées, ce qui n'est pas l'objectif recherché. 
+\smallskip
+\item Nous avons utilisé des \texttt{mutex} pour protéger le \textit{socket} de descripteur de fichier du \textit{send} ainsi que l'entier "\texttt{elemenow}" utilisé dans les différents threads (exclusion mutuelle).
+\end{enumerate}
+
+%\subsection{Extensions}
+\end{document}
